@@ -59,7 +59,6 @@ function removeMarkers(text: string): string {
   return text.replace(/{{/g, '').replace(/}}/g, '');
 }
 
-
 // Удаляем функцию processBoldMarkers, так как больше не используем маркеры {{ }}
 
 function processRuns(paragraph: Element, placeholders: PlaceholderData[], options: DocumentOptions): void {
@@ -109,9 +108,8 @@ function processRuns(paragraph: Element, placeholders: PlaceholderData[], option
       const placeholder = placeholders.find(p => p.name === name);
       const placeholderLength = match[0].length;
 
-      if (placeholder && placeholder.value) {
-        const replacement = escapeXml(cleanupWhitespace(placeholder.value));
-
+      if (placeholder) {
+        const replacement = placeholder.value?.trim() ? escapeXml(cleanupWhitespace(placeholder.value)) : '';
         const format = positionMap[i] || { bold: false, italic: false, underline: false, color: null, rPr: null };
 
         for (let j = 0; j < replacement.length; j++) {
