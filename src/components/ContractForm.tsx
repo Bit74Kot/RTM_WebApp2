@@ -12,8 +12,6 @@ import {
   MenuItem,
   TextField,
   Stack,
-  List,
-  ListItem,
   Divider,
   Alert,
   IconButton,
@@ -363,232 +361,270 @@ function ContractForm() {
   };
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Подготовка договора
-        </Typography>
+    <Box>
+      {/* Верхний блок с полями и кнопками */}
+      <Box sx={{ mb: 2 }}>
+        <Container maxWidth="lg">
+          <Typography variant="h4" component="h1" gutterBottom>
+            Подготовка договора
+          </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
 
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Stack spacing={3}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={8}>
-                <TextField
-                  fullWidth
-                  disabled
-                  value={contractFile?.name || ''}
-                  label="Шаблон договора"
-                />
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Stack spacing={3}>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={8}>
+                  <TextField
+                    fullWidth
+                    disabled
+                    value={contractFile?.name || ''}
+                    label="Шаблон договора"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button
+                    variant="contained"
+                    component="label"
+                    fullWidth
+                  >
+                    Загрузить шаблон договора
+                    <input
+                      type="file"
+                      hidden
+                      accept=".docx"
+                      onChange={handleContractUpload}
+                    />
+                  </Button>
+                </Grid>
               </Grid>
-              <Grid item xs={12} md={4}>
+
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} md={8}>
+                  <TextField
+                    fullWidth
+                    disabled
+                    value={requisitesFile?.name || ''}
+                    label="Файл реквизитов"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button
+                    variant="contained"
+                    component="label"
+                    fullWidth
+                  >
+                    Загрузить реквизиты
+                    <input
+                      type="file"
+                      hidden
+                      accept=".docx,.pdf"
+                      onChange={handleRequisitesUpload}
+                    />
+                  </Button>
+                </Grid>
+              </Grid>
+
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Шрифт</InputLabel>
+                    <Select
+                      value={font}
+                      label="Шрифт"
+                      onChange={(e) => setFont(e.target.value)}
+                    >
+                      <MenuItem value="Calibri">Calibri</MenuItem>
+                      <MenuItem value="Arial">Arial</MenuItem>
+                      <MenuItem value="Times New Roman">Times New Roman</MenuItem>
+                      <MenuItem value="Garamond">Garamond</MenuItem>
+                      <MenuItem value="Cambria">Cambria</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={6}>
+                  <FormControl fullWidth>
+                    <InputLabel>Размер шрифта</InputLabel>
+                    <Select
+                      value={fontSize}
+                      label="Размер шрифта"
+                      onChange={(e) => setFontSize(Number(e.target.value))}
+                    >
+                      {[9, 10, 11, 12].map(size => (
+                        <MenuItem key={size} value={size}>{size}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
                 <Button
                   variant="contained"
-                  component="label"
-                  fullWidth
+                  color="primary"
+                  onClick={handleMatchRequisites}
+                  disabled={!contractFile || !requisitesFile}
                 >
-                  Загрузить шаблон договора
-                  <input
-                    type="file"
-                    hidden
-                    accept=".docx"
-                    onChange={handleContractUpload}
-                  />
+                  Сопоставить реквизиты
                 </Button>
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={8}>
-                <TextField
-                  fullWidth
-                  disabled
-                  value={requisitesFile?.name || ''}
-                  label="Файл реквизитов"
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
                 <Button
                   variant="contained"
-                  component="label"
-                  fullWidth
+                  onClick={handleCreateDocument}
+                  disabled={!contractFile}
                 >
-                  Загрузить реквизиты
-                  <input
-                    type="file"
-                    hidden
-                    accept=".docx,.pdf"
-                    onChange={handleRequisitesUpload}
-                  />
+                  Создать договор
                 </Button>
-              </Grid>
-            </Grid>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={handlePreview}
+                  disabled={!contractFile}
+                  startIcon={<PreviewIcon />}
+                >
+                  Предпросмотр
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/')}
+                >
+                  В главное меню
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+        </Container>
+      </Box>
 
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Шрифт</InputLabel>
-                  <Select
-                    value={font}
-                    label="Шрифт"
-                    onChange={(e) => setFont(e.target.value)}
-                  >
-                    <MenuItem value="Calibri">Calibri</MenuItem>
-                    <MenuItem value="Arial">Arial</MenuItem>
-                    <MenuItem value="Times New Roman">Times New Roman</MenuItem>
-                    <MenuItem value="Garamond">Garamond</MenuItem>
-                    <MenuItem value="Cambria">Cambria</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Размер шрифта</InputLabel>
-                  <Select
-                    value={fontSize}
-                    label="Размер шрифта"
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                  >
-                    {[9, 10, 11, 12].map(size => (
-                      <MenuItem key={size} value={size}>{size}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
+      <Box sx={{ overflowX: 'auto', overflowY: 'hidden', pb: 2, display: 'flex', justifyContent: 'center' }}>
+        <Grid container spacing={2} wrap="nowrap" sx={{ width: 'max-content', maxWidth: '100%', justifyContent: 'center' }}>
 
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleMatchRequisites}
-                disabled={!contractFile || !requisitesFile}
-              >
-                Сопоставить реквизиты
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleCreateDocument}
-                disabled={!contractFile}
-              >
-                Создать договор
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={handlePreview}
-                disabled={!contractFile}
-                startIcon={<PreviewIcon />}
-              >
-                Предпросмотр
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/')}
-              >
-                В главное меню
-              </Button>
-            </Box>
-          </Stack>
-        </Paper>
-
-        <Grid container spacing={2}>
-          {placeholders.length > 0 && (
-            <Grid item xs={6}>
-              <Paper sx={{ p: 2, height: '400px', overflow: 'auto' }}>
+          {/* Левый фрейм */}
+          <Grid item sx={{ minWidth: `${Math.min(2, Math.ceil(placeholders.length / 14)) * 320}px` }}>
+            <Paper sx={{
+              p: 2,
+              maxHeight: `${2 * 56 * 14 + 32}px`,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative'
+            }}>
+              <Box sx={{ overflowX: 'auto', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                 <Typography variant="h6" gutterBottom>
                   Плейсхолдеры
                 </Typography>
-                <List>
-                  {placeholders.map((placeholder, index) => (
-                    <React.Fragment key={index}>
-                      <ListItem>
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item xs={4}>
-                            <Typography>{placeholder.name}:</Typography>
-                          </Grid>
-                          <Grid item xs={7}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={placeholder.value}
-                              onChange={(e) => handlePlaceholderChange(index, e.target.value)}
-                              onKeyDown={(e) => handlePlaceholderKeyDown(e, index)}
-                            />
-                          </Grid>
-                          <Grid item xs={1}>
-                            <Tooltip 
-                              title="Вставить скопированное значение" 
-                              TransitionComponent={Zoom}
-                            >
-                              <span>
-                                <IconButton
+              </Box>
+              <Box sx={{ display: 'flex', minWidth: `${Math.min(2, Math.ceil(placeholders.length / 14)) * 320}px`, overflowX: 'auto' }}>
+                {Array.from({ length: Math.ceil(placeholders.length / 14) }).map((_, colIndex) => (
+                  <Box key={colIndex} sx={{ minWidth: 300, pr: 2 }}>
+                    <Grid container spacing={2} direction="column">
+                      {placeholders
+                        .slice(colIndex * 14, (colIndex + 1) * 14)
+                        .map((placeholder, index) => (
+                          <Grid item key={index}>
+                            <Grid container spacing={1} alignItems="center" wrap="nowrap">
+                              <Grid item>
+                                <Tooltip title={placeholder.name} TransitionComponent={Zoom}>
+                                  <Typography sx={{ width: '15ch', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {placeholder.name}:
+                                  </Typography>
+                                </Tooltip>
+                              </Grid>
+                              <Grid item>
+                                <TextField
+                                  inputProps={{ style: { width: '21ch' } }}
                                   size="small"
-                                  onClick={() => handlePastePlaceholder(index)}
-                                  disabled={!copiedValue}
-                                >
-                                  <ContentPasteIcon />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
+                                  value={placeholder.value}
+                                  onChange={(e) => handlePlaceholderChange(index + colIndex * 14, e.target.value)}
+                                  onKeyDown={(e) => handlePlaceholderKeyDown(e, index + colIndex * 14)}
+                                />
+                              </Grid>
+                              <Grid item>
+                                <Tooltip title="Вставить скопированное значение" TransitionComponent={Zoom}>
+                                  <span>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handlePastePlaceholder(index + colIndex * 14)}
+                                      disabled={!copiedValue}
+                                    >
+                                      <ContentPasteIcon />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              </Grid>
+                            </Grid>
+                            <Divider sx={{ mt: 1, mb: 1 }} />
                           </Grid>
-                        </Grid>
-                      </ListItem>
-                      <Divider />
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Paper>
-            </Grid>
-          )}
+                        ))}
+                    </Grid>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          </Grid>
 
-          {requisites.length > 0 && (
-            <Grid item xs={6}>
-              <Paper sx={{ p: 2, height: '400px', overflow: 'auto' }}>
+          {/* Правый фрейм */}
+          <Grid item>
+            <Paper sx={{
+              p: 2,
+              maxHeight: `${2 * 56 * 14 + 32}px`,
+              width: `${2 * 320}px`,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative'
+            }}>
+              <Box sx={{ overflowX: 'auto', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                 <Typography variant="h6" gutterBottom>
                   Реквизиты
                 </Typography>
-                <List>
-                  {requisites.map((requisite, index) => (
-                    <React.Fragment key={index}>
-                      <ListItem>
-                        <Grid container spacing={2} alignItems="center">
-                          <Grid item xs={10}>
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={requisite.value}
-                              disabled
-                              onKeyDown={(e) => handleKeyDown(e, requisite.value)}
-                            />
+              </Box>
+              <Box sx={{ display: 'flex', minWidth: `${Math.ceil(requisites.length / 14) * 320}px`, overflowX: 'auto' }}>
+                {Array.from({ length: Math.ceil(requisites.length / 14) }).map((_, colIndex) => (
+                  <Box key={colIndex} sx={{ minWidth: 300, pr: 2 }}>
+                    <Grid container spacing={2} direction="column">
+                      {requisites
+                        .slice(colIndex * 14, (colIndex + 1) * 14)
+                        .map((requisite, index) => (
+                          <Grid item key={index}>
+                            <Grid container spacing={1} alignItems="center" wrap="nowrap">
+                              <Grid item>
+                                <Tooltip title={requisite.value} TransitionComponent={Zoom}>
+                                  <TextField
+                                    inputProps={{ style: { width: '21ch' } }}
+                                    size="small"
+                                    value={requisite.value}
+                                    disabled
+                                    onKeyDown={(e) => handleKeyDown(e, requisite.value)}
+                                  />
+                                </Tooltip>
+                              </Grid>
+                              <Grid item>
+                                <Tooltip title="Копировать значение" TransitionComponent={Zoom}>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleCopyRequisite(requisite.value)}
+                                  >
+                                    <ContentCopyIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </Grid>
+                            </Grid>
+                            <Divider sx={{ mt: 1, mb: 1 }} />
                           </Grid>
-                          <Grid item xs={2}>
-                            <Tooltip 
-                              title="Копировать значение" 
-                              TransitionComponent={Zoom}
-                            >
-                              <IconButton
-                                size="small"
-                                onClick={() => handleCopyRequisite(requisite.value)}
-                              >
-                                <ContentCopyIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Grid>
-                        </Grid>
-                      </ListItem>
-                      <Divider />
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Paper>
-            </Grid>
-          )}
+                        ))}
+                    </Grid>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+          </Grid>
+
         </Grid>
       </Box>
 
@@ -726,7 +762,7 @@ function ContractForm() {
         onClose={handleSnackbarClose}
         message={snackbarMessage}
       />
-    </Container>
+    </Box>
   );
 }
 
