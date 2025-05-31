@@ -21,23 +21,37 @@ export async function extractTextFromPDF(file: File): Promise<string[]> {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      
-      const pageLines = textContent.items
-        .filter((item): item is TextItem => 'str' in item)
-        .map((item: TextItem) => item.str.trim())
-        .filter(text => text.length > 0 && /[a-zA-Zа-яА-ЯёЁ0-9]/.test(text));
+
+      // Группируем текстовые элементы по координате y
+      const linesMap = new Map<number, string[]>();
+
+      textContent.items.forEach((item) => {
+        if ('str' in item && item.str.trim()) {
+          const textItem = item as TextItem;
+          const y = Math.round(textItem.transform[5]); // координата Y, округляем
+          if (!linesMap.has(y)) {
+            linesMap.set(y, []);
+          }
+          linesMap.get(y)!.push(textItem.str);
+        }
+      });
+
+      const pageLines = [...linesMap.entries()]
+        .sort((a, b) => b[0] - a[0]) // сверху вниз
+        .map(([_, words]) => words.join(' ').replace(/\s+/g, ' ').trim())
+        .filter(line => line.length > 0 && /[a-zA-Zа-яА-ЯёЁ0-9]/.test(line));
 
       allLines.push(...pageLines);
     }
 
-    return [...new Set(allLines)]
-      .filter(line => line.length > 0)
-      .map(line => line.replace(/\s+/g, ' ').trim());
+    return [...new Set(allLines)];
+
   } catch (error) {
     console.error('Error extracting text from PDF:', error);
     throw new Error('Failed to extract text from PDF');
   }
 }
+
 
 export async function loadRequisitesFromPDF(file: File): Promise<RequisiteData[]> {
   try {
