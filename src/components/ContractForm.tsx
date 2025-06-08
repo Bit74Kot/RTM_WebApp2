@@ -34,7 +34,7 @@ import {
   loadRequisites,
   matchRequisitesToPlaceholders,
   createAndSaveDocuments,
-  createTemplate,
+  createPrepopulatedTemplate,
   type PlaceholderData,
   type RequisiteData,
   handleRequisiteChange,
@@ -338,7 +338,8 @@ function ContractForm() {
     }
 
     try {
-      await createTemplate(invoiceTemplateFile, placeholders);
+      if (!templateFile) return;
+      await createPrepopulatedTemplate(placeholders, invoiceTemplateFile);
       setSnackbarMessage('Шаблон счета успешно создан');
       setSnackbarOpen(true);
     } catch (error) {
@@ -356,7 +357,8 @@ function ContractForm() {
     }
 
     try {
-      await createTemplate(actTemplateFile, placeholders);
+      if (!templateFile) return;
+      await createPrepopulatedTemplate(placeholders, actTemplateFile);
       setSnackbarMessage('Шаблон акта успешно создан');
       setSnackbarOpen(true);
     } catch (error) {
