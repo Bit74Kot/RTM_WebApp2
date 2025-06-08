@@ -36,10 +36,10 @@ import {
   createAndSaveDocuments,
   createTemplate,
   type PlaceholderData,
-  type RequisiteData
+  type RequisiteData,
+  handleRequisiteChange,
   
 } from '../utils/documentUtils';
-
 
 function ContractForm() {
   const navigate = useNavigate();
@@ -70,16 +70,21 @@ function ContractForm() {
   
     try {
       const arrayBuffer = await templateFile.arrayBuffer();
-      let html = await mammoth.convertToHtml({ arrayBuffer });
+      const html = await mammoth.convertToHtml({ arrayBuffer });
       let content = html.value;
   
+      // Заменяем плейсхолдеры
       for (const placeholder of placeholders) {
         if (placeholder.value) {
-          const regex = new RegExp(`#${placeholder.name}`, 'g');
+          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z])`, 'g');
           content = content.replace(regex, placeholder.value);
         }
       }
   
+      // ❌ Удаляем изображения из предпросмотра
+      content = content.replace(/<img[^>]*>/g, '');
+  
+      // Добавляем стили предпросмотра
       content = `
         <style>
           body {
@@ -107,13 +112,14 @@ function ContractForm() {
       setPreviewHtml(content);
       setPreviewDialogOpen(true);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Не удалось создать предпросмотр';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Не удалось создать предпросмотр';
       setError(errorMessage);
       setSnackbarMessage(errorMessage);
       setSnackbarOpen(true);
     }
   };
-
+ 
   const handleSnackbarClose = () => {
     setSnackbarOpen(false);
   };
@@ -595,13 +601,20 @@ function ContractForm() {
                             <Grid container spacing={1} alignItems="center" wrap="nowrap">
                               <Grid item>
                                 <Tooltip title={requisite.value} TransitionComponent={Zoom}>
-                                  <TextField
-                                    inputProps={{ style: { width: '21ch' } }}
-                                    size="small"
-                                    value={requisite.value}
-                                    disabled
-                                    onKeyDown={(e) => handleKeyDown(e, requisite.value)}
-                                  />
+                                <TextField
+                                  inputProps={{ style: { width: '21ch' } }}
+                                  size="small"
+                                  value={requisite.value}
+                                  onChange={(e) =>
+                                    handleRequisiteChange(
+                                      index + colIndex * 14,
+                                      e.target.value,
+                                      requisites,
+                                      setRequisites
+                                    )
+                                  }
+                                  onKeyDown={(e) => handleKeyDown(e, requisite.value)}
+                                />
                                 </Tooltip>
                               </Grid>
                               <Grid item>
