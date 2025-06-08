@@ -20,6 +20,7 @@ export interface DocumentOptions {
 
 export const placeholderPatterns: Record<string, RegExp> = {
   имя: /[А-ЯЁ][а-яё]+\s[А-ЯЁ][а-яё]+\s[А-ЯЁ][а-яё]+/,
+  имякратко: /[А-ЯЁ][а-яё]+\s[А-ЯЁ][а-яё]+\s[А-ЯЁ][а-яё]+/,
   название: /"[^"]*[A-ZА-ЯЁ][^"]*"/,
   огрнип: /\b\d{15}\b/,
   огрн: /\b\d{13}\b/,
@@ -27,6 +28,8 @@ export const placeholderPatterns: Record<string, RegExp> = {
   инно: /\b\d{10}\b/,
   бик: /\b04\d{7}\b/,
   кпп: /\b\d{9}\b/,
+  снилс: /\b\d{3}-\d{3}-\d{3} \d{2}\b/i,
+  госномер: /\b[А-Я]{1}\d{3}[А-Я]{2}\d{2,3}\b/,
   расчетныйсчет: /\b40\d{18}\b/,
   коррсчет: /\b30\d{18}\b/,
   адрес: /(?=.*\d)(?=.*[a-zA-Zа-яА-ЯёЁ])(?=.*[.,]).*/,
@@ -157,11 +160,11 @@ function processRuns(paragraph: Element, placeholders: PlaceholderData[], option
         const runText = finalText.slice(currentStart, i);
         const newRun = paragraph.ownerDocument.createElement('w:r');
 
-        if (current.rPr && !current.bold && !current.italic && !current.underline && !current.color) {
+        if (current.rPr) {
           newRun.appendChild(current.rPr.cloneNode(true));
+        } else {
+          updateRunPropertiesWithStyle(newRun, options, current.bold, current.italic, current.underline, current.color);
         }
-
-        updateRunPropertiesWithStyle(newRun, options, current.bold, current.italic, current.underline, current.color);
 
         for (const char of runText) {
           if (char === '\t') {
@@ -186,22 +189,35 @@ function processRuns(paragraph: Element, placeholders: PlaceholderData[], option
   }
 }
 
-function updateRunPropertiesWithStyle(run: Element, options: DocumentOptions, isBold = false, isItalic = false, isUnderline = false, color: string | null = null): void {
+function updateRunPropertiesWithStyle(
+  run: Element,
+  options: DocumentOptions,
+  isBold = false,
+  isItalic = false,
+  isUnderline = false,
+  color: string | null = null
+): void {
   let rPr = run.getElementsByTagName('w:rPr')[0];
   if (!rPr) {
     rPr = run.ownerDocument.createElement('w:rPr');
     run.insertBefore(rPr, run.firstChild);
   }
 
-  const rFonts = run.ownerDocument.createElement('w:rFonts');
-  rFonts.setAttribute('w:ascii', options.font);
-  rFonts.setAttribute('w:hAnsi', options.font);
-  rFonts.setAttribute('w:cs', options.font);
-  rPr.appendChild(rFonts);
+  // ✅ Сохраняем оригинальный шрифт
+  if (options.font && options.font !== 'preserve') {
+    const rFonts = run.ownerDocument.createElement('w:rFonts');
+    rFonts.setAttribute('w:ascii', options.font);
+    rFonts.setAttribute('w:hAnsi', options.font);
+    rFonts.setAttribute('w:cs', options.font);
+    rPr.appendChild(rFonts);
+  }
 
-  const sz = run.ownerDocument.createElement('w:sz');
-  sz.setAttribute('w:val', String(options.fontSize * 2));
-  rPr.appendChild(sz);
+  // ✅ Сохраняем оригинальный размер
+  if (options.fontSize && options.fontSize > 0) {
+    const sz = run.ownerDocument.createElement('w:sz');
+    sz.setAttribute('w:val', String(options.fontSize * 2));
+    rPr.appendChild(sz);
+  }
 
   if (isBold) {
     const bold = run.ownerDocument.createElement('w:b');
@@ -240,6 +256,28 @@ async function processDocumentXml(xml: string, placeholders: PlaceholderData[], 
   return new XMLSerializer().serializeToString(xmlDoc);
 }
 
+export function handleRequisiteChange(
+  index: number,
+  newValue: string,
+  requisites: RequisiteData[],
+  setRequisites: React.Dispatch<React.SetStateAction<RequisiteData[]>>
+) {
+  const updated = [...requisites];
+  updated[index] = { ...updated[index], value: newValue };
+  setRequisites(updated);
+}
+
+export function pasteValueToPlaceholder(
+  index: number,
+  value: string,
+  placeholders: PlaceholderData[],
+  setPlaceholders: React.Dispatch<React.SetStateAction<PlaceholderData[]>>
+) {
+  const updated = [...placeholders];
+  updated[index] = { ...updated[index], value };
+  setPlaceholders(updated);
+}
+
 export async function createAndSaveDocuments(
   placeholders: PlaceholderData[],
   file: File,
@@ -275,7 +313,6 @@ export async function createAndSaveDocuments(
     throw error;
   }
 }
-
 
 export async function createTemplate(
   templateFile: File,
@@ -419,31 +456,93 @@ export function matchRequisitesToPlaceholders(
   placeholders: PlaceholderData[],
   requisites: RequisiteData[]
 ): PlaceholderData[] {
-  if (!placeholders || !requisites) {
-    throw new Error('Missing placeholders or requisites');
-  }
-
   const updatedPlaceholders = [...placeholders];
   const usedValues = new Set<string>();
-  
+
+  // Паттерны ФИО
+  const fullNameRegex = /[А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+/;
+  const shortNameRegex = /\b[А-ЯЁ][а-яё]+\s[А-ЯЁ]\.(?:\s?[А-ЯЁ]\.)?\b/;
+
+  // Найти полное имя
+  let fullName: string | null = null;
+  let shortName: string | null = null;
+
+  for (const { value } of requisites) {
+    if (!fullName) {
+      const match = value.match(fullNameRegex);
+      if (match) fullName = match[0];
+    }
+    if (!shortName) {
+      const match = value.match(shortNameRegex);
+      if (match) shortName = match[0];
+    }
+  }
+
+  // Сформировать краткое имя
+  if (!shortName && fullName) {
+    const parts = fullName.split(' ');
+    if (parts.length === 3) {
+      const [last, first, middle] = parts;
+      shortName = `${last} ${first[0]}.${middle[0]}.`;
+    }
+  }
+
+  // Функция нормализации госномера
+  function normalizePlate(value: string): string {
+    const map: Record<string, string> = {
+      A: 'А', a: 'А', B: 'В', b: 'В', E: 'Е', e: 'Е',
+      K: 'К', k: 'К', M: 'М', m: 'М', H: 'Н', h: 'Н',
+      O: 'О', o: 'О', P: 'Р', p: 'Р', C: 'С', c: 'С',
+      T: 'Т', t: 'Т', Y: 'У', y: 'У', X: 'Х', x: 'Х'
+    };
+    return value.replace(/[A-Za-z]/g, ch => map[ch] || ch).toUpperCase();
+  }
+
+  // Проверка, похожа ли строка на госномер
+  function looksLikeCarPlate(value: string): boolean {
+    const normalized = normalizePlate(value);
+    return /^[А-Я]{1}\d{3}[А-Я]{2}\d{2,3}$/.test(normalized);
+  }
+
   for (const placeholder of updatedPlaceholders) {
-    const lowerName = placeholder.name.toLowerCase();
-    
-    for (const [patternKey, pattern] of Object.entries(placeholderPatterns)) {
-      if (lowerName.includes(patternKey)) {
-        for (const requisite of requisites) {
-          const value = removeMarkers(requisite.value.trim());
-          if (pattern.test(value) && !usedValues.has(value)) {
-            placeholder.value = value;
-            usedValues.add(value);
-            break;
-          }
+    const placeholderKey = placeholder.name.trim().toLowerCase();
+
+    if (placeholderKey === 'имя' && fullName) {
+      placeholder.value = fullName;
+      usedValues.add(fullName);
+      continue;
+    }
+
+    if (placeholderKey === 'имякратко' && shortName) {
+      placeholder.value = shortName;
+      usedValues.add(shortName);
+      continue;
+    }
+
+    if (placeholderKey === 'госномер') {
+      for (const { value } of requisites) {
+        if (looksLikeCarPlate(value)) {
+          const normalized = normalizePlate(value);
+          placeholder.value = normalized;
+          usedValues.add(normalized);
+          break;
         }
+      }
+      continue;
+    }
+
+    const pattern = placeholderPatterns[placeholderKey];
+    if (!pattern) continue;
+
+    for (const { value } of requisites) {
+      if (pattern.test(value) && !usedValues.has(value)) {
+        placeholder.value = value;
+        usedValues.add(value);
         break;
       }
     }
   }
-  
+
   return updatedPlaceholders;
 }
 
@@ -451,60 +550,53 @@ function replaceTextInParagraphTemplate(paragraph: Element, placeholders: Placeh
   const runs = Array.from(paragraph.getElementsByTagName('w:r'));
   if (runs.length === 0) return;
 
-  // Get full text from all runs
+  // Собрать исходный текст абзаца
   let fullText = '';
-  const runProperties: Element[] = [];
-  
-  runs.forEach(run => {
-    const rPr = run.getElementsByTagName('w:rPr')[0];
-    if (rPr) runProperties.push(rPr.cloneNode(true) as Element);
-    
-    const texts = run.getElementsByTagName('w:t');
-    fullText += Array.from(texts).map(t => t.textContent || '').join('');
-  });
+  for (const run of runs) {
+    const texts = Array.from(run.getElementsByTagName('w:t'));
+    for (const t of texts) {
+      fullText += t.textContent || '';
+    }
+  }
 
-  let replaced = false;
-  let processedText = fullText;
+  let wasModified = false;
 
-  // Replace placeholders
+  // Заменить все плейсхолдеры
   for (const placeholder of placeholders) {
-    if (placeholder.value) {
-      const pattern = `#${placeholder.name}`;
-      if (processedText.includes(pattern)) {
-        processedText = processedText.replace(
-          new RegExp(escapeRegExp(pattern), 'g'),
-          escapeXml(cleanupWhitespace(placeholder.value))
-        );
-        replaced = true;
-      }
+    if (!placeholder.value) continue;
+    const pattern = `#${placeholder.name}`;
+    if (fullText.includes(pattern)) {
+      fullText = fullText.replace(
+        new RegExp(escapeRegExp(pattern), 'g'),
+        escapeXml(cleanupWhitespace(placeholder.value))
+      );
+      wasModified = true;
     }
   }
 
-  // If any replacements were made, update the paragraph
-  if (replaced) {
-    // Clear all existing runs
-    runs.forEach(run => {
-      if (run.parentNode) {
-        run.parentNode.removeChild(run);
-      }
-    });
+  if (!wasModified) return;
 
-    // Create a new run with the processed text
-    const newRun = paragraph.ownerDocument.createElement('w:r');
-    
-    // Apply the first available run properties
-    if (runProperties.length > 0) {
-      newRun.appendChild(runProperties[0]);
-    }
+  // Сохраняем стиль первого run
+  const firstRun = runs[0];
+  const rPr = firstRun.getElementsByTagName('w:rPr')[0]?.cloneNode(true);
 
-    const newText = paragraph.ownerDocument.createElement('w:t');
-    newText.setAttribute('xml:space', 'preserve');
-    newText.textContent = processedText;
-    newRun.appendChild(newText);
-    
-    paragraph.appendChild(newRun);
+  // Удалить старые элементы
+  while (paragraph.firstChild) {
+    paragraph.removeChild(paragraph.firstChild);
   }
+
+  // Создать новый run с сохранённым стилем
+  const newRun = paragraph.ownerDocument.createElement('w:r');
+  if (rPr) {
+    newRun.appendChild(rPr);
+  }
+
+  const newText = paragraph.ownerDocument.createElement('w:t');
+  newText.textContent = fullText;
+  newRun.appendChild(newText);
+  paragraph.appendChild(newRun);
 }
+
 
 function replaceTextInTablesTemplate(tables: Element[], placeholders: PlaceholderData[]): void {
   for (const table of tables) {
@@ -532,5 +624,40 @@ function replaceTextInHeadersFootersTemplate(document: Document, placeholders: P
       const headerFooterParagraphs = document.getElementsByTagName('w:p');
       replaceTextInParagraphsTemplate(Array.from(headerFooterParagraphs), placeholders);
     }
+  }
+}
+
+export async function createDocumentPreserveStyles(
+  placeholders: PlaceholderData[],
+  file: File
+): Promise<void> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    const documentXml = await zip.file('word/document.xml')?.async('text');
+    if (!documentXml) throw new Error('Could not find document.xml');
+
+    const processedXml = await processDocumentXml(documentXml, placeholders, {
+      font: 'preserve',      // специальный маркер: не изменять шрифт
+      fontSize: -1           // специальный маркер: не изменять размер
+    });
+
+    const newZip = new JSZip();
+    for (const [path, zipEntry] of Object.entries(zip.files)) {
+      if (path === 'word/document.xml') {
+        newZip.file(path, processedXml, { binary: false });
+      } else {
+        const content = await zipEntry.async('uint8array');
+        newZip.file(path, content);
+      }
+    }
+
+    const docxContent = await newZip.generateAsync({ type: 'blob' });
+    const fileName = `Документ_${new Date().toISOString().replace(/[:.]/g, '-')}.docx`;
+    saveAs(docxContent, fileName);
+  } catch (error) {
+    console.error('Document creation error:', error);
+    throw error;
   }
 }
