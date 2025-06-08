@@ -1,28 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  Container, 
-  Box, 
-  Typography, 
-  Button,
-  Paper,
-  Grid,
-  TextField,
-  Stack,
-  List,
-  ListItem,
-  Divider,
-  Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
+import {
+  Container, Box, Typography, Button, Paper, Grid, TextField, Stack,
+  Alert, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar
 } from '@mui/material';
 import PreviewIcon from '@mui/icons-material/Preview';
 import { useNavigate } from 'react-router-dom';
 import mammoth from 'mammoth';
-import { 
+import {
   findPlaceholders,
-  createTemplate,
+  createDocumentPreserveStyles,
   type PlaceholderData
 } from '../utils/documentUtils';
 
@@ -33,6 +19,8 @@ function InvoiceActForm() {
   const [error, setError] = useState<string>('');
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const handleTemplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -40,6 +28,8 @@ function InvoiceActForm() {
 
     if (!file.name.endsWith('.docx')) {
       setError('Пожалуйста, загрузите файл в формате DOCX');
+      setSnackbarMessage('Неверный формат файла');
+      setSnackbarOpen(true);
       return;
     }
 
@@ -48,32 +38,33 @@ function InvoiceActForm() {
       const foundPlaceholders = await findPlaceholders(file);
       setPlaceholders(foundPlaceholders);
       setError('');
+      setSnackbarMessage('Шаблон успешно загружен');
+      setSnackbarOpen(true);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Не удалось обработать файл шаблона';
+      const errorMessage = error instanceof Error ? error.message : 'Ошибка при обработке шаблона';
       setError(errorMessage);
+      setSnackbarMessage(errorMessage);
+      setSnackbarOpen(true);
     }
   };
 
   const handlePlaceholderChange = (index: number, value: string) => {
-    const newPlaceholders = [...placeholders];
-    newPlaceholders[index].value = value;
-    setPlaceholders(newPlaceholders);
+    const updated = [...placeholders];
+    updated[index].value = value;
+    setPlaceholders(updated);
   };
 
   const handlePreview = async () => {
-    if (!templateFile) {
-      setError('Пожалуйста, загрузите шаблон');
-      return;
-    }
+    if (!templateFile) return;
 
     try {
       const arrayBuffer = await templateFile.arrayBuffer();
-      let html = await mammoth.convertToHtml({ arrayBuffer });
-      let content = html.value;
+      const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
 
+      let content = html;
       for (const placeholder of placeholders) {
         if (placeholder.value) {
-          const regex = new RegExp(`#${placeholder.name}`, 'g');
+          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z])`, 'g');
           content = content.replace(regex, placeholder.value);
         }
       }
@@ -107,35 +98,37 @@ function InvoiceActForm() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Не удалось создать предпросмотр';
       setError(errorMessage);
+      setSnackbarMessage(errorMessage);
+      setSnackbarOpen(true);
     }
   };
 
   const handleCreateDocument = async () => {
-    if (!templateFile) {
-      setError('Пожалуйста, загрузите шаблон');
-      return;
-    }
+    if (!templateFile) return;
 
     try {
-      await createTemplate(templateFile, placeholders);
-      setError('');
+      await createDocumentPreserveStyles(placeholders, templateFile);
+      setSnackbarMessage('Документ успешно создан');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Не удалось создать документ';
       setError(errorMessage);
+      setSnackbarMessage(errorMessage);
+    } finally {
+      setSnackbarOpen(true);
     }
   };
+
+  const handleSnackbarClose = () => setSnackbarOpen(false);
 
   return (
     <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Подготовка счета/акта
+        <Typography variant="h4" gutterBottom>
+          Подготовка счета / акта
         </Typography>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
         )}
 
         <Paper sx={{ p: 3, mb: 3 }}>
@@ -146,15 +139,11 @@ function InvoiceActForm() {
                   fullWidth
                   disabled
                   value={templateFile?.name || ''}
-                  label="Файл шаблона"
+                  label="Шаблон документа"
                 />
               </Grid>
               <Grid item xs={12} md={4}>
-                <Button
-                  variant="contained"
-                  component="label"
-                  fullWidth
-                >
+                <Button variant="contained" component="label" fullWidth>
                   Загрузить шаблон
                   <input
                     type="file"
@@ -166,7 +155,7 @@ function InvoiceActForm() {
               </Grid>
             </Grid>
 
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
+            <Box sx={{ display: 'flex', gap: 2 }}>
               <Button
                 variant="contained"
                 onClick={handleCreateDocument}
@@ -183,43 +172,27 @@ function InvoiceActForm() {
               >
                 Предпросмотр
               </Button>
-              <Button
-                variant="outlined"
-                onClick={() => navigate('/')}
-              >
-                В главное меню
-              </Button>
+              <Button variant="outlined" onClick={() => navigate('/')}>В главное меню</Button>
             </Box>
           </Stack>
         </Paper>
 
         {placeholders.length > 0 && (
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Поля документа
-            </Typography>
-            <List>
-              {placeholders.map((placeholder, index) => (
-                <React.Fragment key={index}>
-                  <ListItem>
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid item xs={4}>
-                        <Typography>{placeholder.name}:</Typography>
-                      </Grid>
-                      <Grid item xs={8}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          value={placeholder.value}
-                          onChange={(e) => handlePlaceholderChange(index, e.target.value)}
-                        />
-                      </Grid>
-                    </Grid>
-                  </ListItem>
-                  <Divider />
-                </React.Fragment>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>Плейсхолдеры</Typography>
+            <Grid container spacing={2}>
+              {placeholders.map((ph, index) => (
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                  <TextField
+                    label={ph.name}
+                    fullWidth
+                    size="small"
+                    value={ph.value}
+                    onChange={(e) => handlePlaceholderChange(index, e.target.value)}
+                  />
+                </Grid>
               ))}
-            </List>
+            </Grid>
           </Paper>
         )}
 
@@ -231,8 +204,8 @@ function InvoiceActForm() {
         >
           <DialogTitle>Предпросмотр документа</DialogTitle>
           <DialogContent>
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 p: 2,
                 border: '1px solid #e0e0e0',
                 borderRadius: 1,
@@ -248,6 +221,13 @@ function InvoiceActForm() {
             <Button onClick={() => setPreviewDialogOpen(false)}>Закрыть</Button>
           </DialogActions>
         </Dialog>
+
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={3000}
+          onClose={handleSnackbarClose}
+          message={snackbarMessage}
+        />
       </Box>
     </Container>
   );
