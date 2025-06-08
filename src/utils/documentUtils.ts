@@ -314,65 +314,11 @@ export async function createAndSaveDocuments(
   }
 }
 
-export async function createTemplate(
-  templateFile: File,
-  placeholders: PlaceholderData[]
+export async function createPrepopulatedTemplate(
+  placeholders: PlaceholderData[],
+  file: File
 ): Promise<void> {
-  if (!templateFile) {
-    throw new Error('Template file is required');
-  }
-
-  try {
-    const arrayBuffer = await templateFile.arrayBuffer();
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    
-    const documentXml = await zip.file('word/document.xml')?.async('text');
-    if (!documentXml) {
-      throw new Error('Could not find document.xml in the template');
-    }
-
-    // Parse the document XML
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(documentXml, 'text/xml');
-
-    if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
-      throw new Error('Failed to parse document XML');
-    }
-
-    // Apply template-specific replacements
-    const paragraphs = xmlDoc.getElementsByTagName('w:p');
-    replaceTextInParagraphsTemplate(Array.from(paragraphs), placeholders);
-
-    const tables = xmlDoc.getElementsByTagName('w:tbl');
-    replaceTextInTablesTemplate(Array.from(tables), placeholders);
-
-    replaceTextInHeadersFootersTemplate(xmlDoc, placeholders);
-
-    // Create a new ZIP to preserve all original files
-    const newZip = new JSZip();
-    
-    // Copy all files from original ZIP to preserve styles and formatting
-    for (const [path, file] of Object.entries(zip.files)) {
-      if (path === 'word/document.xml') {
-        const serializedXml = new XMLSerializer().serializeToString(xmlDoc);
-        newZip.file(path, serializedXml);
-      } else {
-        const content = await file.async('arraybuffer');
-        newZip.file(path, content);
-      }
-    }
-
-    // Generate DOCX content
-    const docxContent = await newZip.generateAsync({ type: 'blob' });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const docxFileName = `template_${timestamp}.docx`;
-
-    // Save DOCX file
-    await saveAs(docxContent, docxFileName);
-  } catch (error) {
-    console.error('Template creation error:', error);
-    throw new Error(`Failed to create template: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+  return createDocumentPreserveStyles(placeholders, file);
 }
 
 export function replacePlaceholders(template: string, placeholders: PlaceholderData[]): string {
@@ -544,87 +490,6 @@ export function matchRequisitesToPlaceholders(
   }
 
   return updatedPlaceholders;
-}
-
-function replaceTextInParagraphTemplate(paragraph: Element, placeholders: PlaceholderData[]): void {
-  const runs = Array.from(paragraph.getElementsByTagName('w:r'));
-  if (runs.length === 0) return;
-
-  // Собрать исходный текст абзаца
-  let fullText = '';
-  for (const run of runs) {
-    const texts = Array.from(run.getElementsByTagName('w:t'));
-    for (const t of texts) {
-      fullText += t.textContent || '';
-    }
-  }
-
-  let wasModified = false;
-
-  // Заменить все плейсхолдеры
-  for (const placeholder of placeholders) {
-    if (!placeholder.value) continue;
-    const pattern = `#${placeholder.name}`;
-    if (fullText.includes(pattern)) {
-      fullText = fullText.replace(
-        new RegExp(escapeRegExp(pattern), 'g'),
-        escapeXml(cleanupWhitespace(placeholder.value))
-      );
-      wasModified = true;
-    }
-  }
-
-  if (!wasModified) return;
-
-  // Сохраняем стиль первого run
-  const firstRun = runs[0];
-  const rPr = firstRun.getElementsByTagName('w:rPr')[0]?.cloneNode(true);
-
-  // Удалить старые элементы
-  while (paragraph.firstChild) {
-    paragraph.removeChild(paragraph.firstChild);
-  }
-
-  // Создать новый run с сохранённым стилем
-  const newRun = paragraph.ownerDocument.createElement('w:r');
-  if (rPr) {
-    newRun.appendChild(rPr);
-  }
-
-  const newText = paragraph.ownerDocument.createElement('w:t');
-  newText.textContent = fullText;
-  newRun.appendChild(newText);
-  paragraph.appendChild(newRun);
-}
-
-
-function replaceTextInTablesTemplate(tables: Element[], placeholders: PlaceholderData[]): void {
-  for (const table of tables) {
-    const cells = table.getElementsByTagName('w:tc');
-    for (const cell of Array.from(cells)) {
-      const paragraphs = cell.getElementsByTagName('w:p');
-      replaceTextInParagraphsTemplate(Array.from(paragraphs), placeholders);
-    }
-  }
-}
-
-function replaceTextInParagraphsTemplate(paragraphs: Element[], placeholders: PlaceholderData[]): void {
-  for (const paragraph of paragraphs) {
-    replaceTextInParagraphTemplate(paragraph, placeholders);
-  }
-}
-
-function replaceTextInHeadersFootersTemplate(document: Document, placeholders: PlaceholderData[]): void {
-  const headerRefs = document.getElementsByTagName('w:headerReference');
-  const footerRefs = document.getElementsByTagName('w:footerReference');
-
-  for (const ref of [...Array.from(headerRefs), ...Array.from(footerRefs)]) {
-    const refId = ref.getAttribute('r:id');
-    if (refId) {
-      const headerFooterParagraphs = document.getElementsByTagName('w:p');
-      replaceTextInParagraphsTemplate(Array.from(headerFooterParagraphs), placeholders);
-    }
-  }
 }
 
 export async function createDocumentPreserveStyles(
