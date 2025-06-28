@@ -22,6 +22,7 @@ function InvoiceActForm() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [saveAsPdf, setSaveAsPdf] = useState(true); // ✅ добавляем флаг
+  const [fileName, setFileName] = useState('Документ');
 
   const handleTemplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -117,7 +118,8 @@ function InvoiceActForm() {
       await createDocumentPreserveStyles(placeholders, templateFile, {
         font: '',         // заглушка
         fontSize: 0,      // заглушка
-        createPdf: saveAsPdf
+        createPdf: saveAsPdf,
+        customFileName: fileName
       });
       
       setSnackbarMessage('Документ успешно создан');
@@ -171,6 +173,13 @@ function InvoiceActForm() {
             <FormControlLabel
               control={<Checkbox checked={saveAsPdf} onChange={(e) => setSaveAsPdf(e.target.checked)} />}
               label="Сохранить в PDF"
+            />
+
+            <TextField
+              label="Сохранить документ как:"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              fullWidth
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
