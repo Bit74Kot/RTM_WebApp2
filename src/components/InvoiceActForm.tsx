@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Container, Box, Typography, Button, Paper, Grid, TextField, Stack,
-  Alert, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar
+  Alert, Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, FormControlLabel, Checkbox
 } from '@mui/material';
 import PreviewIcon from '@mui/icons-material/Preview';
 import { useNavigate } from 'react-router-dom';
@@ -9,7 +9,7 @@ import mammoth from 'mammoth';
 import {
   findPlaceholders,
   createDocumentPreserveStyles,
-  type PlaceholderData
+  PlaceholderData
 } from '../utils/documentUtils';
 
 function InvoiceActForm() {
@@ -21,6 +21,7 @@ function InvoiceActForm() {
   const [previewHtml, setPreviewHtml] = useState('');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [saveAsPdf, setSaveAsPdf] = useState(true); // ✅ добавляем флаг
 
   const handleTemplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -54,6 +55,12 @@ function InvoiceActForm() {
     setPlaceholders(updated);
   };
 
+  const totalFields = placeholders.length;
+  const fieldsPerColumn = 14;
+  const maxVisibleColumns = 4;
+
+  const columnCount = Math.ceil(totalFields / fieldsPerColumn);
+  
   const handlePreview = async () => {
     if (!templateFile) return;
 
@@ -64,7 +71,7 @@ function InvoiceActForm() {
       let content = html;
       for (const placeholder of placeholders) {
         if (placeholder.value) {
-          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z])`, 'g');
+          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z0-9])`, 'g');
           content = content.replace(regex, placeholder.value);
         }
       }
@@ -105,9 +112,14 @@ function InvoiceActForm() {
 
   const handleCreateDocument = async () => {
     if (!templateFile) return;
-
+  
     try {
-      await createDocumentPreserveStyles(placeholders, templateFile);
+      await createDocumentPreserveStyles(placeholders, templateFile, {
+        font: '',         // заглушка
+        fontSize: 0,      // заглушка
+        createPdf: saveAsPdf
+      });
+      
       setSnackbarMessage('Документ успешно создан');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Не удалось создать документ';
@@ -117,6 +129,7 @@ function InvoiceActForm() {
       setSnackbarOpen(true);
     }
   };
+  
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -155,6 +168,11 @@ function InvoiceActForm() {
               </Grid>
             </Grid>
 
+            <FormControlLabel
+              control={<Checkbox checked={saveAsPdf} onChange={(e) => setSaveAsPdf(e.target.checked)} />}
+              label="Сохранить в PDF"
+            />
+
             <Box sx={{ display: 'flex', gap: 2 }}>
               <Button
                 variant="contained"
@@ -180,19 +198,60 @@ function InvoiceActForm() {
         {placeholders.length > 0 && (
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>Плейсхолдеры</Typography>
-            <Grid container spacing={2}>
-              {placeholders.map((ph, index) => (
-                <Grid item xs={12} sm={6} md={4} key={index}>
-                  <TextField
-                    label={ph.name}
-                    fullWidth
-                    size="small"
-                    value={ph.value}
-                    onChange={(e) => handlePlaceholderChange(index, e.target.value)}
-                  />
-                </Grid>
-              ))}
-            </Grid>
+            <Box sx={{ mt: 3 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  overflowX: columnCount > maxVisibleColumns ? 'auto' : 'visible',
+                  overflowY: 'hidden',
+                  borderTop: '1px solid #ddd',
+                  borderBottom: '1px solid #ddd',
+                  pt: 2,
+                  pb: 2,
+                  justifyContent: 'center'
+                }}
+              >
+                {Array.from({ length: columnCount }).map((_, colIndex) => (
+                  <Box key={colIndex} sx={{ display: 'flex', flexDirection: 'column', pr: 2 }}>
+                    {placeholders
+                      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0)) // 👈 Добавить ЭТО
+                      .slice(colIndex * fieldsPerColumn, (colIndex + 1) * fieldsPerColumn)
+                      .map((ph, index) => {
+                        const isTextBlock = /^текст\d*$/i.test(ph.name);
+                        const maxChars = columnCount === 1 ? 80 : Math.max(20, Math.floor(80 / columnCount));
+
+                        return (
+                          <TextField
+                            key={index}
+                            label={ph.name.length > 15 ? `${ph.name.slice(0, 15)}...` : ph.name}
+                            title={ph.name}
+                            value={ph.value}
+                            onChange={(e) =>
+                              handlePlaceholderChange(index + colIndex * fieldsPerColumn, e.target.value)
+                            }
+                            multiline={isTextBlock}
+                            minRows={isTextBlock ? 2 : undefined}
+                            maxRows={isTextBlock ? 5 : undefined}
+                            inputProps={{
+                              style: {
+                                width: `${maxChars}ch`,
+                                overflowY: 'auto',
+                                resize: 'none',
+                                scrollbarWidth: 'thin',
+                                direction: 'ltr',
+                                textAlign: 'left'
+                              }
+                            }}
+                            sx={{ mb: 2 }}
+                            size="small"
+                          />
+                        );
+                      })}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
           </Paper>
         )}
 
