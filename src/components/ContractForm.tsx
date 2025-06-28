@@ -540,7 +540,7 @@ function ContractForm() {
             }}>
               <Box sx={{ overflowX: 'auto', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                 <Typography variant="h6" gutterBottom>
-                  Плейсхолдеры
+                  Вставить значения
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', minWidth: `${Math.min(2, Math.ceil(placeholders.length / 14)) * 320}px`, overflowX: 'auto' }}>
