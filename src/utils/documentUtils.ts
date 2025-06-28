@@ -5,6 +5,7 @@ import { saveAs } from 'file-saver';
 export interface PlaceholderData {
   name: string;
   value: string;
+  position?: number;
 }
 
 export interface RequisiteData {
@@ -105,7 +106,7 @@ function processRuns(paragraph: Element, placeholders: PlaceholderData[], option
 
   let i = 0;
   while (i < fullText.length) {
-    const match = fullText.slice(i).match(/^#([a-zA-Zа-яА-ЯёЁ]+)/);
+    const match = fullText.slice(i).match(/^#([a-zA-Zа-яА-ЯёЁ0-9]+)/);
     if (match) {
       const name = match[1];
       const placeholder = placeholders.find(p => p.name === name);
@@ -308,6 +309,25 @@ export async function createAndSaveDocuments(
     const docxContent = await newZip.generateAsync({ type: 'blob' });
     saveAs(docxContent, 'Договор.docx');
 
+    if (options.createPdf) {
+      const formData = new FormData();
+      formData.append('file', docxContent, 'Договор.docx');
+
+      try {
+        const response = await fetch('https://contract-pdf-server-production.up.railway.app/convert-to-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error('Ошибка при получении PDF');
+
+        const blob = await response.blob();
+        saveAs(blob, 'Договор.pdf');
+      } catch (err) {
+        console.error('PDF conversion error:', err);
+      }
+    }
+
   } catch (error) {
     console.error('Document creation error:', error);
     throw error;
@@ -347,13 +367,21 @@ export async function findPlaceholders(file: File): Promise<PlaceholderData[]> {
     const result = await mammoth.convertToHtml({ arrayBuffer });
     const htmlContent = result.value;
 
-    const regex = /#([a-zA-Zа-яА-ЯёЁ]+)/g;
-    const matches = htmlContent.match(regex) || [];
-    const uniquePlaceholders = [...new Set(matches.map(match => match.slice(1)))];
-    
-    return uniquePlaceholders.map(name => ({
+    const regex = /#([a-zA-Zа-яА-ЯёЁ0-9]+)/g;
+    const placeholdersMap: Record<string, number> = {};
+    let match;
+
+    while ((match = regex.exec(htmlContent)) !== null) {
+      const name = match[1];
+      if (!(name in placeholdersMap)) {
+        placeholdersMap[name] = match.index; // сохранить позицию первого вхождения
+      }
+    }
+
+    return Object.entries(placeholdersMap).map(([name, position]) => ({
       name,
-      value: ''
+      value: '',
+      position
     }));
   } catch (error) {
     console.error('Error finding placeholders:', error);
@@ -494,7 +522,8 @@ export function matchRequisitesToPlaceholders(
 
 export async function createDocumentPreserveStyles(
   placeholders: PlaceholderData[],
-  file: File
+  file: File,
+  options?: DocumentOptions
 ): Promise<void> {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -521,8 +550,28 @@ export async function createDocumentPreserveStyles(
     const docxContent = await newZip.generateAsync({ type: 'blob' });
     const fileName = `Документ_${new Date().toISOString().replace(/[:.]/g, '-')}.docx`;
     saveAs(docxContent, fileName);
+
+    if (options?.createPdf) {
+      const formData = new FormData();
+      formData.append('file', docxContent, 'Документ.docx');
+
+      try {
+        const response = await fetch('https://contract-pdf-server-production.up.railway.app/convert-to-pdf', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error('Ошибка при получении PDF');
+
+        const blob = await response.blob();
+        saveAs(blob, 'Документ.pdf');
+      } catch (err) {
+        console.error('PDF conversion error:', err);
+      }
+    }
   } catch (error) {
     console.error('Document creation error:', error);
     throw error;
   }
 }
+
