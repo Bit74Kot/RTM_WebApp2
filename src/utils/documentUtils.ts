@@ -14,9 +14,10 @@ export interface RequisiteData {
 }
 
 export interface DocumentOptions {
-  font: string;
-  fontSize: number;
+  font?: string;
+  fontSize?: number;
   createPdf?: boolean;
+  customFileName?: string;
 }
 
 export const placeholderPatterns: Record<string, RegExp> = {
@@ -548,12 +549,12 @@ export async function createDocumentPreserveStyles(
     }
 
     const docxContent = await newZip.generateAsync({ type: 'blob' });
-    const fileName = `Документ_${new Date().toISOString().replace(/[:.]/g, '-')}.docx`;
-    saveAs(docxContent, fileName);
+    const baseFileName = options?.customFileName?.trim() || file.name.replace(/\.docx$/i, '') || 'Документ';
+    saveAs(docxContent, `${baseFileName}.docx`);
 
     if (options?.createPdf) {
       const formData = new FormData();
-      formData.append('file', docxContent, 'Документ.docx');
+      formData.append('file', docxContent, `${baseFileName}.docx`);
 
       try {
         const response = await fetch('https://contract-pdf-server-production.up.railway.app/convert-to-pdf', {
@@ -564,7 +565,7 @@ export async function createDocumentPreserveStyles(
         if (!response.ok) throw new Error('Ошибка при получении PDF');
 
         const blob = await response.blob();
-        saveAs(blob, 'Документ.pdf');
+        saveAs(blob, `${baseFileName}.pdf`);
       } catch (err) {
         console.error('PDF conversion error:', err);
       }
