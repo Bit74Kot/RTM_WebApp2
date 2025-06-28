@@ -6,7 +6,9 @@ import {
   Button,
   Paper,
   Grid,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   InputLabel,
   Select,
   MenuItem,
@@ -35,7 +37,7 @@ import {
   matchRequisitesToPlaceholders,
   createAndSaveDocuments,
   createPrepopulatedTemplate,
-  type PlaceholderData,
+  PlaceholderData,
   type RequisiteData,
   handleRequisiteChange,
   
@@ -47,6 +49,7 @@ function ContractForm() {
   const [requisitesFile, setRequisitesFile] = useState<File | null>(null);
   const [font, setFont] = useState('Calibri');
   const [fontSize, setFontSize] = useState(11);
+  const [saveAsPdf, setSaveAsPdf] = useState(true); // ✅ PDF-флаг
   const [placeholders, setPlaceholders] = useState<PlaceholderData[]>([]);
   const [requisites, setRequisites] = useState<RequisiteData[]>([]);
   const [error, setError] = useState<string>('');
@@ -76,7 +79,7 @@ function ContractForm() {
       // Заменяем плейсхолдеры
       for (const placeholder of placeholders) {
         if (placeholder.value) {
-          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z])`, 'g');
+          const regex = new RegExp(`#${placeholder.name}(?![а-яА-ЯёЁa-zA-Z0-9])`, 'g');
           content = content.replace(regex, placeholder.value);
         }
       }
@@ -127,7 +130,9 @@ function ContractForm() {
   const handlePlaceholderChange = (index: number, value: string) => {
     const newPlaceholders = [...placeholders];
     newPlaceholders[index].value = value;
-    setPlaceholders(newPlaceholders);
+    setPlaceholders(
+      [...newPlaceholders].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    );
   };
 
   const handleContractUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,7 +243,8 @@ function ContractForm() {
 		templateFile,
 		{
 		  font,
-		  fontSize
+		  fontSize,
+      createPdf: saveAsPdf // ✅ передаём PDF-флаг
 		}
         
       );
@@ -468,7 +474,18 @@ function ContractForm() {
                     </Select>
                   </FormControl>
                 </Grid>
-              </Grid>
+                </Grid>
+              
+                {/* ✅ Чекбокс "Сохранить в PDF" */}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={saveAsPdf}
+                      onChange={(e) => setSaveAsPdf(e.target.checked)}
+                    />
+                  }
+                  label="Сохранить в PDF"
+                />
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
                 <Button
@@ -543,13 +560,30 @@ function ContractForm() {
                                 </Tooltip>
                               </Grid>
                               <Grid item>
-                                <TextField
-                                  inputProps={{ style: { width: '21ch' } }}
-                                  size="small"
-                                  value={placeholder.value}
-                                  onChange={(e) => handlePlaceholderChange(index + colIndex * 14, e.target.value)}
-                                  onKeyDown={(e) => handlePlaceholderKeyDown(e, index + colIndex * 14)}
-                                />
+                                {placeholder.name.toLowerCase().startsWith('текст') ? (
+                                  <TextField
+                                    multiline
+                                    minRows={2}
+                                    maxRows={5}
+                                    inputProps={{
+                                      style: {
+                                        width: '21ch',
+                                        overflow: 'auto',
+                                      },
+                                    }}
+                                    value={placeholder.value}
+                                    onChange={(e) => handlePlaceholderChange(index + colIndex * 14, e.target.value)}
+                                    onKeyDown={(e) => handlePlaceholderKeyDown(e, index + colIndex * 14)}
+                                  />
+                                ) : (
+                                  <TextField
+                                    inputProps={{ style: { width: '21ch' } }}
+                                    size="small"
+                                    value={placeholder.value}
+                                    onChange={(e) => handlePlaceholderChange(index + colIndex * 14, e.target.value)}
+                                    onKeyDown={(e) => handlePlaceholderKeyDown(e, index + colIndex * 14)}
+                                  />
+                                )}
                               </Grid>
                               <Grid item>
                                 <Tooltip title="Вставить скопированное значение" TransitionComponent={Zoom}>
