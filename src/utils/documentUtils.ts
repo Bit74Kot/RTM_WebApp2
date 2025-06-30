@@ -45,11 +45,11 @@ function escapeRegExp(string: string): string {
 
 function escapeXml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
+    .replace(/&/g, '&amp;')  // важно: первым
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/"/g, '"')     // оставляем кавычки как есть
+    .replace(/'/g, "'");
 }
 
 function cleanupWhitespace(text: string): string {
@@ -63,6 +63,7 @@ function cleanupWhitespace(text: string): string {
 function removeMarkers(text: string): string {
   return text.replace(/{{/g, '').replace(/}}/g, '');
 }
+
 
 // Удаляем функцию processBoldMarkers, так как больше не используем маркеры {{ }}
 
@@ -308,11 +309,14 @@ export async function createAndSaveDocuments(
 
     // Генерируем и сохраняем DOCX
     const docxContent = await newZip.generateAsync({ type: 'blob' });
-    saveAs(docxContent, 'Договор.docx');
+    const baseFileName = options.customFileName?.trim();
+    if (!baseFileName) throw new Error('Имя файла не задано.');
+    saveAs(docxContent, `${baseFileName}.docx`);
+
 
     if (options.createPdf) {
       const formData = new FormData();
-      formData.append('file', docxContent, 'Договор.docx');
+      formData.append('file', docxContent, `${baseFileName}.docx`);
 
       try {
         const response = await fetch('https://contract-pdf-server-production.up.railway.app/convert-to-pdf', {
@@ -323,7 +327,7 @@ export async function createAndSaveDocuments(
         if (!response.ok) throw new Error('Ошибка при получении PDF');
 
         const blob = await response.blob();
-        saveAs(blob, 'Договор.pdf');
+        saveAs(blob, `${baseFileName}.pdf`);
       } catch (err) {
         console.error('PDF conversion error:', err);
       }
@@ -352,9 +356,11 @@ export function replacePlaceholders(template: string, placeholders: PlaceholderD
     if (placeholder.value) {
       const regex = new RegExp(`#${escapeRegExp(placeholder.name)}`, 'g');
       const cleanValue = cleanupWhitespace(placeholder.value);
-      content = content.replace(regex, cleanValue);
+      const escapedValue = escapeXml(cleanValue); // 👈 безопасная подстановка
+      content = content.replace(regex, escapedValue);
     }
   });
+
   return content;
 }
 
@@ -534,8 +540,8 @@ export async function createDocumentPreserveStyles(
     if (!documentXml) throw new Error('Could not find document.xml');
 
     const processedXml = await processDocumentXml(documentXml, placeholders, {
-      font: 'preserve',      // специальный маркер: не изменять шрифт
-      fontSize: -1           // специальный маркер: не изменять размер
+      font: 'preserve',
+      fontSize: -1
     });
 
     const newZip = new JSZip();
@@ -549,7 +555,15 @@ export async function createDocumentPreserveStyles(
     }
 
     const docxContent = await newZip.generateAsync({ type: 'blob' });
-    const baseFileName = options?.customFileName?.trim() || file.name.replace(/\.docx$/i, '') || 'Документ';
+
+    // Получаем имя из файла и Имякратко
+    const originalName = file.name.replace(/\.docx$/i, '') || 'Документ';
+    const shortName = placeholders.find(p => p.name.toLowerCase() === 'имякратко')?.value?.trim() || '';
+
+    const sanitizedShortName = shortName.replace(/[\\/:*?"<>|]/g, '');
+    const autoName = `${originalName}${sanitizedShortName ? '_' + sanitizedShortName : ''}`;
+    const baseFileName = options?.customFileName?.trim() || autoName;
+
     saveAs(docxContent, `${baseFileName}.docx`);
 
     if (options?.createPdf) {
