@@ -63,7 +63,9 @@ function ContractForm() {
   const [templateCreationOpen, setTemplateCreationOpen] = useState(false);
   const [invoiceTemplateFile, setInvoiceTemplateFile] = useState<File | null>(null);
   const [actTemplateFile, setActTemplateFile] = useState<File | null>(null);
-      
+  const [fileName, setFileName] = useState('Договор');
+
+  
   const handlePreview = async () => {
     if (!templateFile) {
       setSnackbarMessage('Пожалуйста, загрузите шаблон договора');
@@ -222,7 +224,14 @@ function ContractForm() {
       setError('Пожалуйста, загрузите шаблон договора');
       return;
     }
-  
+
+    const trimmedFileName = fileName.trim();
+    if (!trimmedFileName || trimmedFileName === 'Договор') {
+      setSnackbarMessage('Пожалуйста, укажите уникальное имя файла перед созданием документа');
+      setSnackbarOpen(true);
+      return;
+    }
+
     try {
       // Читаем файл заново для гарантии актуальности
       const arrayBuffer = await templateFile.arrayBuffer();
@@ -235,21 +244,17 @@ function ContractForm() {
           const regex = new RegExp(`#${placeholder.name}`, 'g');
           content = content.replace(regex, placeholder.value);
         }
+      });             
+      
+
+      await createAndSaveDocuments(placeholders, templateFile, {
+        font,
+        fontSize,
+        createPdf: saveAsPdf,
+        customFileName: fileName.trim()
       });
-  
-      // Сохраняем документ
-      await createAndSaveDocuments(
-        placeholders,
-		templateFile,
-		{
-		  font,
-		  fontSize,
-      createPdf: saveAsPdf // ✅ передаём PDF-флаг
-		}
-        
-      );
-  
-      setSnackbarMessage('Документы успешно созданы');
+
+      setSnackbarMessage(`Документы успешно созданы: ${trimmedFileName}.docx${saveAsPdf ? ' и .pdf' : ''}`);
       setCreateTemplatesDialogOpen(true);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Ошибка создания документов');
@@ -413,10 +418,10 @@ function ContractForm() {
                       accept=".docx"
                       onChange={handleContractUpload}
                     />
-                  </Button>
+                  </Button>                  
                 </Grid>
               </Grid>
-
+              
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} md={8}>
                   <TextField
@@ -442,7 +447,7 @@ function ContractForm() {
                   </Button>
                 </Grid>
               </Grid>
-
+              
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <FormControl fullWidth>
@@ -486,6 +491,12 @@ function ContractForm() {
                   }
                   label="Сохранить в PDF"
                 />
+                <TextField
+                    label="Сохранить документ как:"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    fullWidth
+                  />  
 
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-start' }}>
                 <Button
@@ -521,6 +532,12 @@ function ContractForm() {
               </Box>
             </Stack>
           </Paper>
+          <Snackbar
+            open={snackbarOpen}
+            autoHideDuration={3000}
+            onClose={() => setSnackbarOpen(false)}
+            message={snackbarMessage}
+          />
         </Container>
       </Box>
 
@@ -540,7 +557,7 @@ function ContractForm() {
             }}>
               <Box sx={{ overflowX: 'auto', position: 'sticky', top: 0, backgroundColor: 'white', zIndex: 1 }}>
                 <Typography variant="h6" gutterBottom>
-                  Вставить значения
+                Вставить значения
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', minWidth: `${Math.min(2, Math.ceil(placeholders.length / 14)) * 320}px`, overflowX: 'auto' }}>
@@ -748,7 +765,7 @@ function ContractForm() {
                   fullWidth
                   sx={{ mb: 2 }}
                 >
-                  Загрузить шаблон счета
+                  Загрузить заготовку счета
                   <input
                     type="file"
                     hidden
@@ -779,7 +796,7 @@ function ContractForm() {
                   fullWidth
                   sx={{ mb: 2 }}
                 >
-                  Загрузить шаблон акта
+                  Загрузить заготовку акта
                   <input
                     type="file"
                     hidden
