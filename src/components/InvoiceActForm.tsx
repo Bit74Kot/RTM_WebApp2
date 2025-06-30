@@ -113,23 +113,30 @@ function InvoiceActForm() {
 
   const handleCreateDocument = async () => {
     if (!templateFile) return;
-  
+    
+    const trimmedFileName = fileName.trim();
+    if (!trimmedFileName || trimmedFileName === 'Документ') {
+      setSnackbarMessage('Пожалуйста, укажите уникальное имя файла перед созданием документа');
+      setSnackbarOpen(true);
+      return;
+    }
+
     try {
       await createDocumentPreserveStyles(placeholders, templateFile, {
         font: '',         // заглушка
         fontSize: 0,      // заглушка
         createPdf: saveAsPdf,
-        customFileName: fileName
+        customFileName: trimmedFileName
       });
       
-      setSnackbarMessage('Документ успешно создан');
+      setSnackbarMessage(`Документы успешно созданы: ${trimmedFileName}.docx${saveAsPdf ? ' и .pdf' : ''}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Не удалось создать документ';
-      setError(errorMessage);
       setSnackbarMessage(errorMessage);
     } finally {
       setSnackbarOpen(true);
     }
+
   };
   
 
