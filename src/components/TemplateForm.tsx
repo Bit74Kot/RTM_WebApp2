@@ -194,22 +194,34 @@ function TemplateForm() {
             </Stack>
           </form>
 
-      <Snackbar
-        open={isSuccess}
-        autoHideDuration={4000}
-        onClose={() => setIsSuccess(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setIsSuccess(false)} severity="success" sx={{ width: '100%' }}>
-          Шаблон успешно отправлен!
-        </Alert>
-      </Snackbar>
-
+          <Snackbar
+            open={isSuccess}
+            autoHideDuration={10000}
+            onClose={() => setIsSuccess(false)}
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            sx={{
+              top: '50% !important',
+              transform: 'translateY(-50%)'
+            }}
+          >
+            <Alert
+              onClose={() => setIsSuccess(false)}
+              severity="success"
+              sx={{
+                width: '100%',
+                py: 4,
+                fontSize: '1.1rem',
+                textAlign: 'center'
+              }}
+            >
+              Ваш документ успешно отправлен! Мы пришлем вам готовый шаблон в течение суток
+            </Alert>
+          </Snackbar>
         </Paper>
       </Box>
 
       {isSuccess && (
-        <p className="text-green-600 text-sm text-center">Шаблон успешно отправлен!</p>
+        <p className="text-green-600 text-sm text-center">Документ успешно отправлен!</p>
       )}
       
       <Snackbar
