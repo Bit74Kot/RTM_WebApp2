@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { 
-  Container, 
-  Box, 
-  Typography, 
+import React, { useState, useRef } from 'react';
+import {
+  Container,
+  Box,
+  Typography,
   Button,
   Paper,
   TextField,
@@ -13,105 +13,90 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import emailjs from '@emailjs/browser';
 
-// Initialize EmailJS with public key
-emailjs.init("Uasenk9EK6m4vHl7K");
-
-// Maximum file size in bytes (1MB)
-const MAX_FILE_SIZE = 1024 * 1024;
 
 function TemplateForm() {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [comments, setComments] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState<string>('');
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarMessage] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
+  
+  
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.docx')) {
-      setError('Пожалуйста, загрузите файл в формате DOCX');
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+  
+    // Проверка расширения
+    if (!selectedFile.name.toLowerCase().endsWith('.docx')) {
+      setError("Пожалуйста, загрузите файл в формате .DOCX");
+      setFile(null);
+      setFileName("");
       return;
     }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError('Размер файла не должен превышать 1 МБ');
+  
+    // Проверка размера (20 МБ)
+    if (selectedFile.size > 20 * 1024 * 1024) {
+      setError("Размер файла не должен превышать 20 МБ");
+      setFile(null);
+      setFileName("");
       return;
     }
-
-    setFile(file);
-    setError('');
+  
+    setFile(selectedFile);
+    setFileName(selectedFile.name);
+    setError("");
   };
+  
 
-  const handleSubmit = async () => {
-    if (!file || !name || !email) {
-      setError('Пожалуйста, заполните все обязательные поля');
-      return;
-    }
-
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSuccess(false);
+    setIsSuccess(true);
     setLoading(true);
-    setError('');
-
+  
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("email", email);
+      formData.append("comments", message); // ⬅️ вот ключевое соответствие
+      if (file) {
+        formData.append("file", file);
+      }
       
-      reader.onload = async () => {
-        const base64File = reader.result as string;
-        
-        const templateParams = {
-          to_email: 'aufschrift@gmail.com',
-          from_name: name,
-          from_email: email,
-          message: comments, // Changed from comments to message to match template variable
-          file_name: file.name,
-          file_content: base64File
-        };
+      for (let [key, value] of formData.entries()) {
+        console.log("FormData", key, value);
+      }
 
-        try {
-          await emailjs.send(
-            'service_wecuskb',
-            'template_mauc0oo',
-            templateParams,
-            'Uasenk9EK6m4vHl7K' // Added public key here as well for extra security
-          );
-
-          setSnackbarMessage('Заказ успешно отправлен!');
-          setSnackbarOpen(true);
-          
-          // Clear form
-          setName('');
-          setEmail('');
-          setComments('');
-          setFile(null);
-        } catch (error) {
-          console.error('Email sending error:', error);
-          setError('Произошла ошибка при отправке заказа. Пожалуйста, попробуйте позже.');
-        }
-      };
-
-      reader.onerror = () => {
-        setError('Ошибка при чтении файла');
-      };
-    } catch (error) {
-      console.error('Form submission error:', error);
-      setError('Произошла ошибка. Пожалуйста, попробуйте позже.');
-    } finally {
+      const response = await fetch("https://email-server-production-b175.up.railway.app/api/send-template", {
+        method: "POST",
+        body: formData,
+      });
+  
+      if (response.ok) {
+        setIsSuccess(true);
+        setName("");
+        setEmail("");
+        setMessage("");
+        setFile(null);
+        setFileName("");
+      } else {
+        throw new Error("Ошибка при отправке письма");
+      }
+    } catch (err) {
+      console.error(err);
+      } finally {
       setLoading(false);
     }
-  };
-
-  const handlePayment = () => {
-    // Handle payment logic here
-    console.log('Payment initiated');
   };
 
   return (
@@ -120,99 +105,113 @@ function TemplateForm() {
         <Typography variant="h4" component="h1" gutterBottom align="center">
           Подготовка шаблона
         </Typography>
-
         <Typography variant="subtitle1" gutterBottom align="center" sx={{ mb: 4 }}>
           Заполни эту форму, оплати стоимость ОДНОЙ страницы документа и мы пришлем тебе шаблон, с которым ты сможешь работать
         </Typography>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         <Paper sx={{ p: 4 }}>
-          <Stack spacing={3}>
-            <TextField
-              fullWidth
-              label="Твое имя"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={loading}
-            />
-
-            <TextField
-              fullWidth
-              label="Твой е-мэйл"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<CloudUploadIcon />}
-              fullWidth
-              sx={{ height: '56px' }}
-              disabled={loading}
-            >
-              {file ? file.name : 'Прикрепи документ для шаблона (макс. 1 МБ)'}
-              <input
-                type="file"
-                hidden
-                accept=".docx"
-                onChange={handleFileUpload}
+          <form ref={formRef} onSubmit={handleSubmit}>
+            <Stack spacing={3}>
+              <TextField
+                fullWidth
+                name="from_name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                label="Твое имя"
+                required
+                disabled={loading}
               />
-            </Button>
-
-            <TextField
-              fullWidth
-              label="Твои комментарии и пожелания"
-              multiline
-              rows={4}
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              inputProps={{ maxLength: 1000 }}
-              helperText={`${comments.length}/1000`}
-              disabled={loading}
-            />
-
-            <Stack direction="row" spacing={2}>
-              <Button
-                variant="contained"
-                color="primary"
+              <TextField
                 fullWidth
-                onClick={handlePayment}
-                disabled={loading || !name || !email || !file}
+                name="from_email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                label="Твой е-мэйл"
+                type="email"
+                required
+                disabled={loading}
+              />
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<CloudUploadIcon />}
+                fullWidth
+                sx={{ height: '56px' }}
+                disabled={loading}
               >
-                {loading ? <CircularProgress size={24} /> : 'Оплатить заказ'}
+                {fileName ? fileName : 'Прикрепи документ для шаблона (макс. 1 МБ)'}
+                <input
+                  type="file"
+                  name="attachment"
+                  hidden
+                  accept=".docx"
+                  onChange={handleFileUpload}
+                />
               </Button>
-              <Button
-                variant="contained"
-                color="secondary"
+              <TextField
                 fullWidth
-                onClick={handleSubmit}
-                disabled={loading || !name || !email || !file}
+                name="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                label="Твои комментарии и пожелания"
+                multiline
+                rows={4}
+                inputProps={{ maxLength: 1000 }}
+                helperText="Макс. 1000 символов"
+                disabled={loading}
+              />
+
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  onClick={() => console.log('Оплата...')}
+                  disabled={loading}
+                >
+                  {loading ? <CircularProgress size={24} /> : 'Оплатить заказ'}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="secondary"
+                  fullWidth
+                  disabled={loading}
+                >
+                  {loading ? <CircularProgress size={24} /> : 'Отправить заказ'}
+                </Button>
+              </Stack>
+
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/')}
+                disabled={loading}
               >
-                {loading ? <CircularProgress size={24} /> : 'Отправить заказ'}
+                В главное меню
               </Button>
             </Stack>
+          </form>
 
-            <Button
-              variant="outlined"
-              onClick={() => navigate('/')}
-              disabled={loading}
-            >
-              В главное меню
-            </Button>
-          </Stack>
+      <Snackbar
+        open={isSuccess}
+        autoHideDuration={4000}
+        onClose={() => setIsSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setIsSuccess(false)} severity="success" sx={{ width: '100%' }}>
+          Шаблон успешно отправлен!
+        </Alert>
+      </Snackbar>
+
         </Paper>
       </Box>
 
+      {isSuccess && (
+        <p className="text-green-600 text-sm text-center">Шаблон успешно отправлен!</p>
+      )}
+      
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
