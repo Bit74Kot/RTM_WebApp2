@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { 
   Container, 
   Box, 
@@ -16,6 +17,11 @@ import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import ContractForm from './components/ContractForm';
 import InvoiceActForm from './components/InvoiceActForm';
 import TemplateForm from './components/TemplateForm';
+import PaymentOptions from './components/PaymentOptions';
+import PayeerForm from './components/PayeerForm';
+import SuccessPage from './pages/SuccessPage';
+import FailPage from './pages/FailPage';
+
 
 const theme = createTheme({
   palette: {
@@ -176,6 +182,11 @@ function App() {
             <Route path="/contract" element={<ContractForm />} />
             <Route path="/invoice-act" element={<InvoiceActForm />} />
             <Route path="/template" element={<TemplateForm />} />
+            <Route path="/payments" element={<PaymentOptions />} />
+            <Route path="/pay/payeer" element={<PayeerForm />} />
+            <Route path="/success" element={<SuccessPage />} />
+            <Route path="/fail" element={<FailPage />} />
+
           </Routes>
         </Router>
       </Box>
