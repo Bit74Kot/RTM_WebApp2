@@ -29,8 +29,7 @@ function TemplateForm() {
   const [message, setMessage] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  
-  
+   
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -99,6 +98,13 @@ function TemplateForm() {
     }
   };
 
+  const handlePaymentClick = () => {
+    if (!loading) {
+      console.log('Оплата...');
+      navigate('/payments');
+    }
+  };
+
   return (
     <Container maxWidth="md">
       <Box sx={{ my: 4 }}>
@@ -164,15 +170,16 @@ function TemplateForm() {
               />
 
               <Stack direction="row" spacing={2}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  onClick={() => console.log('Оплата...')}
-                  disabled={loading}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Оплатить заказ'}
-                </Button>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={handlePaymentClick}
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Оплатить заказ'}
+              </Button>
+
                 <Button
                   type="submit"
                   variant="contained"
