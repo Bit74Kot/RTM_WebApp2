@@ -1,16 +1,18 @@
-import { useMemo } from 'react';
-import { Container, Typography, Button, Box } from '@mui/material';
+import { useMemo, useState } from 'react';
+import { Container, Typography, Button, Box, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import sha256 from 'js-sha256';
 
 const PayeerForm = () => {
   const m_shop = '2240994389';
-  const secret_key = 'SECRET_KEY'; // замените на переменную, если нужно
+  const secret_key = 'SECRET_KEY';
   const m_orderid = 'tempid302001';
-  const m_curr = 'USD';
-  const m_amount = '12.50';
   const m_desc_raw = 'Оплата шаблона';
 
-  // ✅ base64 для UTF-8, безопасная в браузере
+  const [currency, setCurrency] = useState<'USD' | 'RUB'>('USD');
+
+  const m_amount = currency === 'USD' ? '12.50' : '1000.00';
+  const m_curr = currency;
+
   const encodeBase64 = (str: string) => {
     return btoa(unescape(encodeURIComponent(str)));
   };
@@ -19,14 +21,33 @@ const PayeerForm = () => {
 
   const m_sign = useMemo(() => {
     const baseString = `${m_shop}:${m_orderid}:${m_amount}:${m_curr}:${m_desc}:${secret_key}`;
-    return sha256.sha256(baseString).toUpperCase(); // ✅ корректно
+    return sha256.sha256(baseString).toUpperCase();
   }, [m_shop, m_orderid, m_amount, m_curr, m_desc, secret_key]);
+
+  const handleCurrencyChange = (_: any, newCurrency: 'USD' | 'RUB' | null) => {
+    if (newCurrency !== null) {
+      setCurrency(newCurrency);
+    }
+  };
 
   return (
     <Container maxWidth="sm" sx={{ mt: 4 }}>
       <Typography variant="h5" align="center" gutterBottom>
         Оплата через Payeer
       </Typography>
+
+      <Box display="flex" justifyContent="center" mt={2}>
+        <ToggleButtonGroup
+          color="primary"
+          value={currency}
+          exclusive
+          onChange={handleCurrencyChange}
+          aria-label="Выбор валюты"
+        >
+          <ToggleButton value="USD">USD – $12.50</ToggleButton>
+          <ToggleButton value="RUB">RUB – ₽1000</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
       <form method="POST" action="https://payeer.com/merchant/">
         <input type="hidden" name="m_shop" value={m_shop} />
@@ -50,3 +71,4 @@ const PayeerForm = () => {
 };
 
 export default PayeerForm;
+
